@@ -1,1 +1,18 @@
+* Why apitest
 API is our promise, so we test API. The API is stable, so testing the API is the least expensive.
+
+* Usage
+#+BEGIN_SRC golang
+
+import (
+  apitest "github.com/zzyongx/go-apitest"
+
+api := apitest.NewHttpTest()
+
+t.Post("/api/login").Data("user", "username").Data("pass", "password").Expect().
+Status().Eq().
+Headers().Eq().Match()
+Json().Eq().Gt().Func().
+Body().Eq().Match()
+
+#+END_SRC
