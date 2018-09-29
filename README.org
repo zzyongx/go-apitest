@@ -1,0 +1,1 @@
+API is our promise, so we test API. The API is stable, so testing the API is the least expensive.
