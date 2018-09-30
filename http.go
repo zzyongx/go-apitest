@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,8 @@ import (
 type Api struct {
 	Endpoint string
 	Timeout  time.Duration
+	Headers  http.Header
+	Cookies  map[string]string
 	Request  *ApiRequest
 }
 
@@ -28,6 +31,7 @@ type ApiRequest struct {
 	Params     url.Values
 
 	Headers http.Header
+	Cookies map[string]string
 
 	Forms url.Values
 	Json  string
@@ -37,6 +41,7 @@ func NewApiRequest() *ApiRequest {
 	return &ApiRequest{
 		Params:  url.Values{},
 		Headers: http.Header{},
+		Cookies: make(map[string]string, 0),
 		Forms:   url.Values{},
 	}
 }
@@ -45,6 +50,8 @@ func NewHttpTest(endpoint string) *Api {
 	return &Api{
 		Endpoint: endpoint,
 		Timeout:  time.Second,
+		Headers:  http.Header{},
+		Cookies:  make(map[string]string, 0),
 		Request:  NewApiRequest(),
 	}
 }
@@ -55,43 +62,50 @@ func (this *Api) Get(path string, params ...interface{}) *Api {
 }
 
 func (this *Api) Param(key string, value interface{}) *Api {
-	this.Request.Params.Add(key, interfaceToString(value))
+	this.Request.Params.Add(key, MustInterfaceToString(value))
 	return this
 }
 
 func (this *Api) Post(path string, params ...interface{}) *Api {
 	this.Request.Method = "POST"
-	return this.request(path, params)
+	return this.request(path, params...)
 }
 
 func (this *Api) Put(path string, params ...interface{}) *Api {
 	this.Request.Method = "PUT"
-	return this.request(path, params)
+	return this.request(path, params...)
 }
 
 func (this *Api) Form(key string, value interface{}) *Api {
-	this.Request.Forms.Add(key, interfaceToString(value))
+	this.Request.Forms.Add(key, MustInterfaceToString(value))
 	return this
 }
 
 func (this *Api) Delete(path string, params ...interface{}) *Api {
 	this.Request.Method = "DELETE"
-	return this.request(path, params)
+	return this.request(path, params...)
 }
 
 func (this *Api) request(path string, params ...interface{}) *Api {
 	this.Request.Path = path
 	for _, param := range params {
-		this.Request.PathParams = append(this.Request.PathParams, interfaceToString(param))
+		this.Request.PathParams = append(this.Request.PathParams, MustInterfaceToString(param))
 	}
 	return this
 }
 
-func (this *Api) Header(name, value string) {
+func (this *Api) Header(name, value string) *Api {
 	this.Request.Headers.Add(name, value)
+	return this
+}
+
+func (this *Api) Cookie(name, value string) *Api {
+	this.Request.Cookies[name] = value
+	return this
 }
 
 func (this *Api) Json(json string) *Api {
+	this.Request.Json = json
 	return this
 }
 
@@ -100,6 +114,7 @@ type ApiExpect struct {
 	req           string
 	statusExpect  *StatusExpect
 	headersExpect *HeadersExpect
+	cookiesExpect *CookiesExpect
 	jsonExpect    *JsonExpect
 }
 
@@ -151,12 +166,30 @@ func (this *Api) doRequest(t *testing.T) (string, *http.Response) {
 		t.Fatalf("NewRequest %v error: %s", this.Request, err)
 	}
 
+	for key, values := range this.Headers {
+		if _, ok := this.Request.Headers[key]; !ok {
+			for _, value := range values {
+				req.Header.Add(key, value)
+			}
+		}
+	}
+
 	for key, values := range this.Request.Headers {
 		for _, value := range values {
 			req.Header.Add(key, value)
 		}
 	}
 	req.Header.Set("Content-Type", contentType)
+
+	for name, value := range this.Cookies {
+		if _, ok := this.Request.Cookies[name]; !ok {
+			req.AddCookie(&http.Cookie{Name: name, Value: value})
+		}
+	}
+
+	for name, value := range this.Request.Cookies {
+		req.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
 
 	tr := &http.Transport{
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: false},
@@ -211,12 +244,36 @@ func (this *Api) Expect(t *testing.T) *ApiExpect {
 		headers:   resp.Header,
 	}
 
+	apiExpect.cookiesExpect = &CookiesExpect{
+		ApiExpect: &apiExpect,
+		cookies:   resp.Cookies(),
+	}
+
 	apiExpect.jsonExpect = &JsonExpect{
 		ApiExpect: &apiExpect,
 		data:      string(body),
 	}
 
 	return &apiExpect
+}
+
+func (this *ApiExpect) Fatalf(format string, args ...interface{}) {
+	newArgs := make([]interface{}, 0)
+	newArgs = append(newArgs, this.req)
+	newArgs = append(newArgs, args...)
+
+	top := -1
+	stacks := strings.Split(string(debug.Stack()), "\n")
+	for i := len(stacks) - 1; i >= 0; i = i - 1 {
+		if ok, _ := regexp.MatchString("^\t.+github.com/zzyongx/go-apitest/[^/]+\\.go", stacks[i]); ok {
+			top = i + 1
+			break
+		}
+	}
+	stacks = stacks[top:]
+	fmt.Println(strings.Join(stacks, "\n"))
+
+	this.t.Fatalf("req: %s > "+format, newArgs...)
 }
 
 func (this *ApiExpect) Req() string {
@@ -229,6 +286,11 @@ func (this *ApiExpect) Status() *StatusExpect {
 
 func (this *ApiExpect) Headers() *HeadersExpect {
 	return this.headersExpect
+}
+
+func (this *ApiExpect) Cookies(name string) *CookiesExpect {
+	this.cookiesExpect.name = name
+	return this.cookiesExpect
 }
 
 func (this *ApiExpect) Json() *JsonExpect {
