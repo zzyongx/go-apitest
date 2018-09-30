@@ -2,17 +2,50 @@
 API is our promise, so we test API. The API is stable, so testing the API is the least expensive.
 
 * Usage
+** init apitest
 #+BEGIN_SRC golang
-
 import (
   apitest "github.com/zzyongx/go-apitest"
+)
 
-api := apitest.NewHttpTest()
-
-t.Post("/api/login").Data("user", "username").Data("pass", "password").Expect().
-Status().Eq().
-Headers().Eq().Match()
-Json().Eq().Gt().Func().
-Body().Eq().Match()
-
+var api *apitest.Api
+func init() {
+  api = apitest.NewHttpTest("http://127.0.0.1:8080")
+}
 #+END_SRC
+
+** create apitest
+#+BEGIN_SRC golang
+import (
+  "testing"
+)
+
+func TestApiXYZ(t *testing.T) {
+	api.Get("/static/config.json").Expect(t).
+		Status().Eq(200).
+		Headers().Eq("Content-Type", "application/json; charset=utf-8").
+		EqAny("Content-Type", "application/json", "application/json; charset=utf-8").
+		Exist("Content-Length").ExistAny("NotFound", "Content-Length").
+		Json().Eq("$.user", "zzyongx")
+
+	api.Post("/api/login").Form("user", "zzyongx").Form("password", "123456").Expect(t).
+		Json().Eq("$.code", 403)
+
+	var token string
+	oneYearAfter := time.Now().Add(365 * 24 * time.Hour)
+	api.Post("/api/login").Form("user", "zzyongx").Form("password", "123465").Expect(t).
+		Cookies("user").Value("zzyongx").Domain("example.com").Expires(time.Now(), oneYearAfter).
+		Cookies("token").Value("90#@xw").Domain("example.com").Expires(time.Now(), oneYearAfter).StoreValue(&token).
+		Json().Eq("$.code", 0)
+
+	if token != "90#@xw" {
+		t.Fatalf("cookie storevalue bug, expect 90#@xw, got %s", token)
+	}
+}
+#+END_SRC
+
+** run apitest
+~go test~
+
+* More example
+see [[./t/t_test.go][http]]

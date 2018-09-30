@@ -12,6 +12,9 @@ type JsonExpect struct {
 	obj  interface{}
 }
 
+type StringMatchFunc func(string, string) bool
+type InterfaceMatchFunc func(interface{}, interface{}) bool
+
 func (this *JsonExpect) MustJsonPathLookup(jpath string) interface{} {
 	defer func() {
 		if r := recover(); r != nil {
@@ -42,17 +45,17 @@ func (this *JsonExpect) MustJsonPathLookup(jpath string) interface{} {
 	return nil
 }
 
-func (this *JsonExpect) Eq(jpath string, value interface{}) *JsonExpect {
+func (this *JsonExpect) Match(jpath string, matchFunc InterfaceMatchFunc, value interface{}) *JsonExpect {
 	inter := this.MustJsonPathLookup(jpath)
 	if inter == nil {
-		if value == nil {
+		if matchFunc(inter, value) {
 			return this
 		} else {
 			this.Fatalf("lookup %s in %s error: null", jpath, this.data)
 		}
 	} else if iv, err := interfaceToString(inter); err == nil {
 		if v, err := interfaceToString(value); err == nil {
-			if iv == v {
+			if matchFunc(iv, v) {
 				return this
 			} else {
 				this.Fatalf("lookup %s in %s error: expect %s, got %s", jpath, this.data, v, iv)
@@ -62,7 +65,7 @@ func (this *JsonExpect) Eq(jpath string, value interface{}) *JsonExpect {
 		}
 	} else if iv, err := interfaceToInt(inter); err == nil {
 		if v, err := interfaceToInt(value); err == nil {
-			if int64(iv) == v {
+			if matchFunc(iv, v) {
 				return this
 			} else {
 				this.Fatalf("lookup %s in %s error: expect %d, got %d", jpath, this.data, v, iv)
@@ -72,7 +75,7 @@ func (this *JsonExpect) Eq(jpath string, value interface{}) *JsonExpect {
 		}
 	} else if iv, err := interfaceToFloat(inter); err == nil {
 		if v, err := interfaceToFloat(value); err == nil {
-			if float64(iv) == v {
+			if matchFunc(iv, v) {
 				return this
 			} else {
 				this.Fatalf("lookup %s in %s error: expect %f, got %f", jpath, this.data, v, iv)
@@ -83,6 +86,75 @@ func (this *JsonExpect) Eq(jpath string, value interface{}) *JsonExpect {
 	} else {
 		this.Fatalf("lookup %s in %s error: expect %v, got %v", jpath, this.data, value, inter)
 	}
+	return this
+}
+
+func (this *JsonExpect) Eq(jpath string, value interface{}) *JsonExpect {
+	return this.Match(jpath, func(x interface{}, y interface{}) bool {
+		if xx, ok := x.(string); ok {
+			yy, _ := y.(string)
+			return xx == yy
+		} else if xx, ok := x.(int64); ok {
+			yy, _ := y.(int64)
+			return xx == yy
+		} else if xx, ok := x.(float64); ok {
+			yy, _ := y.(float64)
+			return xx == yy
+		} else {
+			return x == y
+		}
+	}, value)
+}
+
+func (this *JsonExpect) MatchAnyString(jpath string, matchFunc StringMatchFunc, values ...string) *JsonExpect {
+	inter := this.MustJsonPathLookup(jpath)
+	v := MustInterfaceToString(inter)
+	for _, value := range values {
+		if matchFunc(v, value) {
+			return this
+		}
+	}
+	this.Fatalf("lookup %s in %s error: expect any %v, got %s", jpath, this.data, values, v)
+	return this
+}
+
+func (this *JsonExpect) EqAnyString(jpath string, values ...string) *JsonExpect {
+	return this.MatchAnyString(jpath, func(got, want string) bool { return got == want }, values...)
+}
+
+func (this *JsonExpect) EqAnyInt(jpath string, values ...int64) *JsonExpect {
+	inter := this.MustJsonPathLookup(jpath)
+	v, err := interfaceToInt(inter)
+	if err != nil {
+		this.Fatalf("lookup %s in %s error: %s", jpath, this.data, err)
+	}
+
+	for _, value := range values {
+		if value == v {
+			return this
+		}
+	}
+	this.Fatalf("lookup %s in %s error: expect any %v, got %s", jpath, this.data, values, v)
+	return this
+}
+
+func (this *JsonExpect) EqAnyFloat(jpath string, values ...float64) *JsonExpect {
+	inter := this.MustJsonPathLookup(jpath)
+	v, err := interfaceToFloat(inter)
+	if err != nil {
+		this.Fatalf("lookup %s in %s error: %s", jpath, this.data, err)
+	}
+
+	for _, value := range values {
+		if value == v {
+			return this
+		}
+	}
+	this.Fatalf("lookup %s in %s error: expect any %v, got %s", jpath, this.data, values, v)
+	return this
+}
+
+func (this *JsonExpect) ContainsString(jpath string, value string) *JsonExpect {
 	return this
 }
 
