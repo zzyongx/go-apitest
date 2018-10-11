@@ -4,6 +4,7 @@ import (
 	"github.com/oliveagle/jsonpath"
 	"reflect"
 	"strings"
+	"testing"
 )
 
 type JsonExpect struct {
@@ -222,5 +223,171 @@ func (this *JsonExpect) StoreString(jpath string, ret *string) *JsonExpect {
 	} else {
 		this.Fatalf("lookup %s in %s error: %#v's type is %s", jpath, this.data, v, reflect.ValueOf(v).String())
 	}
+	return this
+}
+
+func (this *JsonExpect) IsNull(jpath string) *JsonExpect {
+	v := this.MustJsonPathLookup(jpath)
+	if v != nil {
+		this.Fatalf("lookup %s in %s is null", jpath, this.data)
+	}
+	return this
+}
+
+func (this *JsonExpect) NotNull(jpath string) *JsonExpect {
+	v := this.MustJsonPathLookup(jpath)
+	if v == nil {
+		this.Fatalf("lookup %s in %s is null", jpath, this.data)
+	}
+	return this
+}
+
+func (this *JsonExpect) MustJsonPahAsInt(jpath string) int64 {
+	i, err := interfaceToInt(this.MustJsonPathLookup(jpath))
+	if err != nil {
+		this.Fatalf("lookup %s in %s is not int", jpath, this.data)
+	}
+	return i
+}
+
+func (this *JsonExpect) Gt(jpath string, value int64) *JsonExpect {
+	if i := this.MustJsonPahAsInt(jpath); !(i > value) {
+		this.Fatalf("%d was not Gt %d", i, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) Ge(jpath string, value int64) *JsonExpect {
+	if i := this.MustJsonPahAsInt(jpath); !(i >= value) {
+		this.Fatalf("%d was not Gt %d", i, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) Lt(jpath string, value int64) *JsonExpect {
+	if i := this.MustJsonPahAsInt(jpath); !(i < value) {
+		this.Fatalf("%d was not Lt %d", i, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) Le(jpath string, value int64) *JsonExpect {
+	if i := this.MustJsonPahAsInt(jpath); !(i <= value) {
+		this.Fatalf("%d was not Le %d", i, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) MustJsonPahAsStringArray(jpath string) []string {
+	inter := this.MustJsonPathLookup(jpath)
+	values, err := interfaceToStrings(inter)
+	if err != nil {
+		this.Fatalf("lookup %s in %s error: %s", jpath, this.data, err)
+	}
+	return values
+}
+
+func (this *JsonExpect) MustJsonPahAsIntArray(jpath string) []int64 {
+	inter := this.MustJsonPathLookup(jpath)
+	values, err := interfaceToInts(inter)
+	if err != nil {
+		this.Fatalf("lookup %s in %s error: %s", jpath, this.data, err)
+	}
+	return values
+}
+
+func (this *JsonExpect) MustJsonPahAsFloatArray(jpath string) []float64 {
+	inter := this.MustJsonPathLookup(jpath)
+	values, err := interfaceToFloats(inter)
+	if err != nil {
+		this.Fatalf("lookup %s in %s error: %s", jpath, this.data, err)
+	}
+	return values
+}
+
+func (this *JsonExpect) StringContains(jpath string, value string) *JsonExpect {
+	values := this.MustJsonPahAsStringArray(jpath)
+	if !stringContains(values, value) {
+		this.Fatalf("looup %s in %s error: %v !contains %s", jpath, this.data, values, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) IntContains(jpath string, value int64) *JsonExpect {
+	values := this.MustJsonPahAsIntArray(jpath)
+	if !intContains(values, value) {
+		this.Fatalf("looup %s in %s error: %v !contains %s", jpath, this.data, values, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) FloatContains(jpath string, value float64) *JsonExpect {
+	values := this.MustJsonPahAsFloatArray(jpath)
+	if !floatContains(values, value) {
+		this.Fatalf("looup %s in %s error: %v !contains %s", jpath, this.data, values, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) Contains(jpath string, value interface{}) *JsonExpect {
+	if v, ok := value.(string); ok {
+		return this.StringContains(jpath, v)
+	} else if v, ok := value.(int64); ok {
+		return this.IntContains(jpath, v)
+	} else if v, ok := value.(int); ok {
+		return this.IntContains(jpath, int64(v))
+	} else if v, ok := value.(float64); ok {
+		return this.FloatContains(jpath, v)
+	} else if v, ok := value.(float32); ok {
+		return this.FloatContains(jpath, float64(v))
+	} else {
+		this.Fatalf("unsupport value type %s", reflect.TypeOf(value))
+	}
+	return this
+}
+
+func (this *JsonExpect) StringOnlyContains(jpath string, value string) *JsonExpect {
+	values := this.MustJsonPahAsStringArray(jpath)
+	if !stringOnlyContains(values, value) {
+		this.Fatalf("lookup %s in %s error: %v contains other than %s", jpath, this.data, values, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) IntOnlyContains(jpath string, value int64) *JsonExpect {
+	values := this.MustJsonPahAsIntArray(jpath)
+	if !intOnlyContains(values, value) {
+		this.Fatalf("lookup %s in %s error: %v contains other than %s", jpath, this.data, values, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) FloatOnlyContains(jpath string, value float64) *JsonExpect {
+	values := this.MustJsonPahAsFloatArray(jpath)
+	if !floatOnlyContains(values, value) {
+		this.Fatalf("lookup %s in %s error: %v contains other than %s", jpath, this.data, values, value)
+	}
+	return this
+}
+
+func (this *JsonExpect) OnlyContains(jpath string, value interface{}) *JsonExpect {
+	if v, ok := value.(string); ok {
+		return this.StringOnlyContains(jpath, v)
+	} else if v, ok := value.(int64); ok {
+		return this.IntOnlyContains(jpath, v)
+	} else if v, ok := value.(int); ok {
+		return this.IntOnlyContains(jpath, int64(v))
+	} else if v, ok := value.(float64); ok {
+		return this.FloatOnlyContains(jpath, v)
+	} else if v, ok := value.(float32); ok {
+		return this.FloatOnlyContains(jpath, float64(v))
+	} else {
+		this.Fatalf("unsupport value type %s", reflect.TypeOf(value))
+	}
+	return this
+}
+
+func (this *JsonExpect) Test(jpath string, test func(t *testing.T, v interface{})) *JsonExpect {
+	test(this.t, this.MustJsonPathLookup(jpath))
 	return this
 }

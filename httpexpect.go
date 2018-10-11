@@ -2,6 +2,7 @@ package apitest
 
 import (
 	"net/http"
+	"testing"
 	"time"
 )
 
@@ -154,7 +155,7 @@ func (this *CookiesExpect) Expires(startAt, endAt time.Time) *CookiesExpect {
 	return this
 }
 
-func (this *CookiesExpect) Test(test func(cookies []*http.Cookie)) *CookiesExpect {
-	test(this.getCookie())
+func (this *CookiesExpect) Test(test func(t *testing.T, cookies []*http.Cookie)) *CookiesExpect {
+	test(this.t, this.getCookie())
 	return this
 }
