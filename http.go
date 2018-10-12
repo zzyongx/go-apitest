@@ -116,6 +116,7 @@ type ApiExpect struct {
 	headersExpect *HeadersExpect
 	cookiesExpect *CookiesExpect
 	jsonExpect    *JsonExpect
+	plainExpect   *PlainExpect
 }
 
 func (this *Api) consUrl() string {
@@ -254,6 +255,11 @@ func (this *Api) Expect(t *testing.T) *ApiExpect {
 		data:      string(body),
 	}
 
+	apiExpect.plainExpect = &PlainExpect{
+		ApiExpect: &apiExpect,
+		data:      body,
+	}
+
 	return &apiExpect
 }
 
@@ -300,4 +306,8 @@ func (this *ApiExpect) Json() *JsonExpect {
 	}
 	this.jsonExpect.obj = obj
 	return this.jsonExpect
+}
+
+func (this *ApiExpect) Plain() *PlainExpect {
+	return this.plainExpect
 }
