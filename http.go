@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -49,7 +48,7 @@ func NewApiRequest() *ApiRequest {
 func NewHttpTest(endpoint string) *Api {
 	return &Api{
 		Endpoint: endpoint,
-		Timeout:  time.Second,
+		Timeout:  time.Second * 300,
 		Headers:  http.Header{},
 		Cookies:  make(map[string]string, 0),
 		Request:  NewApiRequest(),
@@ -268,22 +267,8 @@ func (this *ApiExpect) Fatalf(format string, args ...interface{}) {
 	newArgs = append(newArgs, this.req)
 	newArgs = append(newArgs, args...)
 
-	top := -1
-	stacks := strings.Split(string(debug.Stack()), "\n")
-	for i := len(stacks) - 1; i >= 0; i = i - 1 {
-		if ok, _ := regexp.MatchString("^\t.+github.com/zzyongx/go-apitest/[^/]+\\.go", stacks[i]); ok {
-			top = i + 1
-			break
-		}
-	}
-	stacks = stacks[top:]
-	fmt.Println(strings.Join(stacks, "\n"))
-
+	fmt.Printf("\n%s\n", getApiTestStack())
 	this.t.Fatalf("req: %s > "+format, newArgs...)
-}
-
-func (this *ApiExpect) Req() string {
-	return this.req
 }
 
 func (this *ApiExpect) Status() *StatusExpect {
@@ -302,7 +287,7 @@ func (this *ApiExpect) Cookies(name string) *CookiesExpect {
 func (this *ApiExpect) Json() *JsonExpect {
 	var obj interface{}
 	if err := json.Unmarshal([]byte(this.jsonExpect.data), &obj); err != nil {
-		this.t.Fatalf("req: %s > parse json %s error: %s", this.req, this.jsonExpect.data, err)
+		this.Fatalf("parse json %s error: %s", this.jsonExpect.data, err)
 	}
 	this.jsonExpect.obj = obj
 	return this.jsonExpect

@@ -6,8 +6,24 @@ import (
 	mysql "github.com/go-sql-driver/mysql"
 	"math"
 	"reflect"
+	"regexp"
+	"runtime/debug"
 	"strconv"
+	"strings"
 )
+
+func getApiTestStack() string {
+	top := -1
+	stacks := strings.Split(string(debug.Stack()), "\n")
+	for i := len(stacks) - 1; i >= 0; i = i - 1 {
+		if ok, _ := regexp.MatchString("^\t.+github.com/zzyongx/go-apitest/[^/]+\\.go", stacks[i]); ok {
+			top = i + 1
+			break
+		}
+	}
+	stacks = stacks[top:]
+	return strings.Join(stacks, "\n")
+}
 
 func interfaceToString(v interface{}) (string, error) {
 	if s, ok := v.(string); ok {

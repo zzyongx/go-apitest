@@ -45,7 +45,8 @@ func TestApiXYZ(t *testing.T) {
 #+END_SRC
 
 ** run apitest
-~go test~
+~go test -failfast~
 
 * More example
 see [[./t/t_test.go][http]]
+[[https://godoc.org/github.com/zzyongx/go-apitest][apidoc]]

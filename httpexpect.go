@@ -46,7 +46,7 @@ func (this *HeadersExpect) Exist(name string) *HeadersExpect {
 	if _, ok := this.headers[name]; ok {
 		return this
 	}
-	this.Fatalf("req: %s > header %v not exist", name)
+	this.Fatalf("header %v not exist", name)
 	return this
 }
 
@@ -56,7 +56,7 @@ func (this *HeadersExpect) ExistAny(names ...string) *HeadersExpect {
 			return this
 		}
 	}
-	this.Fatalf("req: %s > none of %v header exists", this.Req(), names)
+	this.Fatalf("none of %v header exists", names)
 	return this
 }
 
@@ -64,13 +64,13 @@ func (this *HeadersExpect) NotExist(name string) *HeadersExpect {
 	if _, ok := this.headers[name]; !ok {
 		return this
 	}
-	this.Fatalf("req: %s > header %s exist", this.Req(), name)
+	this.Fatalf("header %s exist", name)
 	return this
 }
 
 func (this *HeadersExpect) Eq(name, v string) *HeadersExpect {
 	if values, ok := this.headers[name]; !ok {
-		this.Fatalf("req: %s > header %s not exist", this.Req(), name)
+		this.Fatalf("header %s not exist", name)
 		return this
 	} else {
 		for _, value := range values {
@@ -78,14 +78,14 @@ func (this *HeadersExpect) Eq(name, v string) *HeadersExpect {
 				return this
 			}
 		}
-		this.Fatalf("req: %s > header %s expect %s, got %v", this.Req(), name, v, values)
+		this.Fatalf("header %s expect %s, got %v", name, v, values)
 		return this
 	}
 }
 
 func (this *HeadersExpect) EqAny(name string, vs ...string) *HeadersExpect {
 	if values, ok := this.headers[name]; !ok {
-		this.Fatalf("req: %s > header %s not exist", this.Req(), name)
+		this.Fatalf("header %s not exist", name)
 		return this
 	} else {
 		for _, value := range values {
@@ -95,7 +95,7 @@ func (this *HeadersExpect) EqAny(name string, vs ...string) *HeadersExpect {
 				}
 			}
 		}
-		this.Fatalf("req: %s > header %s expect any %v, got %v", this.Req(), name, vs, values)
+		this.Fatalf("header %s expect any %v, got %v", name, vs, values)
 		return this
 	}
 }
@@ -121,7 +121,7 @@ func (this *CookiesExpect) StoreValue(value *string) *CookiesExpect {
 		*value = cookie.Value
 		return this
 	}
-	this.Fatalf("req: %s > cookie %s's value was not found, got %v", this.Req(), this.name, this.cookies)
+	this.Fatalf("cookie %s's value was not found, got %v", this.name, this.cookies)
 	return this
 }
 
@@ -131,7 +131,7 @@ func (this *CookiesExpect) Value(value string) *CookiesExpect {
 			return this
 		}
 	}
-	this.Fatalf("req: %s > cookie %s's value expect %s, got %v", this.Req(), this.name, value, this.cookies)
+	this.Fatalf("cookie %s's value expect %s, got %v", this.name, value, this.cookies)
 	return this
 }
 
@@ -141,7 +141,7 @@ func (this *CookiesExpect) Domain(domain string) *CookiesExpect {
 			return this
 		}
 	}
-	this.Fatalf("req: %s > cookie %s's domain expect %s, got %v", this.Req(), this.name, domain, this.cookies)
+	this.Fatalf("cookie %s's domain expect %s, got %v", this.name, domain, this.cookies)
 	return this
 }
 
@@ -151,7 +151,7 @@ func (this *CookiesExpect) Expires(startAt, endAt time.Time) *CookiesExpect {
 			return this
 		}
 	}
-	this.Fatalf("req: %s > cookie %s's expires expect between %s, got %v", this.Req(), this.name, startAt, endAt, this.cookies)
+	this.Fatalf("cookie %s's expires expect between %s, got %v", this.name, startAt, endAt, this.cookies)
 	return this
 }
 

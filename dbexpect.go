@@ -14,14 +14,16 @@ type Db struct {
 
 type DbRequest struct {
 	op     string
+	dbName string
 	db     *sql.DB
 	sql    string
 	params []interface{}
 }
 
-func NewDbReqest(op string, db *sql.DB, sql string, params []interface{}) *DbRequest {
+func NewDbReqest(op string, name string, db *sql.DB, sql string, params []interface{}) *DbRequest {
 	return &DbRequest{
 		op:     op,
+		dbName: name,
 		db:     db,
 		sql:    sql,
 		params: params,
@@ -52,7 +54,7 @@ func MustNewDbTest(cnf *IniCnf, keys ...string) *Db {
 
 func (this *Db) Exec(name string, sql string, params ...interface{}) *Db {
 	if db, ok := this.dbs[name]; ok {
-		this.request = NewDbReqest("w", db, sql, params)
+		this.request = NewDbReqest("w", name, db, sql, params)
 	} else {
 		panic(fmt.Sprintf("db %s was not found", name))
 	}
@@ -61,7 +63,7 @@ func (this *Db) Exec(name string, sql string, params ...interface{}) *Db {
 
 func (this *Db) Query(name string, sql string, params ...interface{}) *Db {
 	if db, ok := this.dbs[name]; ok {
-		this.request = NewDbReqest("r", db, sql, params)
+		this.request = NewDbReqest("r", name, db, sql, params)
 	} else {
 		panic(fmt.Sprintf("db %s was not found", name))
 	}
@@ -69,7 +71,8 @@ func (this *Db) Query(name string, sql string, params ...interface{}) *Db {
 }
 
 type DbExpect struct {
-	t *testing.T
+	t   *testing.T
+	req string
 
 	rowsAffected int64
 	lastInsertId int64
@@ -78,17 +81,18 @@ type DbExpect struct {
 }
 
 func (this *Db) Expect(t *testing.T) *DbExpect {
-	expect := &DbExpect{t: t}
+	expect := &DbExpect{t: t, req: fmt.Sprintf("db %s sql %s", this.request.dbName, this.request.sql)}
+
 	if this.request.op == "w" {
 		if rowsAffected, lastInsertId, err := dbExec(this.request.db, this.request.sql, this.request.params...); err != nil {
-			t.Fatalf("exec %s error: %s", this.request.sql, err)
+			expect.Fatalf("dbExec error: %s", err)
 		} else {
 			expect.rowsAffected = rowsAffected
 			expect.lastInsertId = lastInsertId
 		}
 	} else {
 		if rows, err := dbQuery(this.request.db, this.request.sql, this.request.params...); err != nil {
-			t.Fatalf("query %s error: %s", this.request.sql, err)
+			expect.Fatalf("dbQuery error: %s", err)
 		} else {
 			expect.rows = rows
 		}
@@ -96,9 +100,32 @@ func (this *Db) Expect(t *testing.T) *DbExpect {
 	return expect
 }
 
+func (this *DbExpect) Fatalf(format string, args ...interface{}) {
+	newArgs := make([]interface{}, 0)
+	newArgs = append(newArgs, this.req)
+	newArgs = append(newArgs, args...)
+
+	fmt.Printf("\n%s\n", getApiTestStack())
+	this.t.Fatalf("req: %s > "+format, newArgs...)
+}
+
 func (this *DbExpect) RowNumEq(num int) *DbExpect {
 	if num != len(this.rows) {
-		this.t.Fatalf("db rows expect %d, got %d", num, len(this.rows))
+		this.Fatalf("db rows expect %d, got %d", num, len(this.rows))
+	}
+	return this
+}
+
+func (this *DbExpect) RowNumGt(num int) *DbExpect {
+	if !(len(this.rows) > num) {
+		this.Fatalf("db rows expect %d > %d", len(this.rows), num)
+	}
+	return this
+}
+
+func (this *DbExpect) RowNumGe(num int) *DbExpect {
+	if !(len(this.rows) >= num) {
+		this.Fatalf("db rows expect %d >= %d", len(this.rows), num)
 	}
 	return this
 }
@@ -106,18 +133,18 @@ func (this *DbExpect) RowNumEq(num int) *DbExpect {
 func (this *DbExpect) Eq(field string, value interface{}) *DbExpect {
 	if v, ok := value.(string); ok {
 		if v != this.rows[0].MustGetString(field) {
-			this.t.Fatalf("field %s expect %s, got %s", field, v, this.rows[0].MustGetString(field))
+			this.Fatalf("field %s expect %s, got %s", field, v, this.rows[0].MustGetString(field))
 		}
 	} else if v, err := interfaceToInt(value); err == nil {
 		if v != this.rows[0].MustGetInt(field) {
-			this.t.Fatalf("field %s expect %d, got %d", field, v, this.rows[0].MustGetInt(field))
+			this.Fatalf("field %s expect %d, got %d", field, v, this.rows[0].MustGetInt(field))
 		}
 	} else if v, err := interfaceToFloat(value); err == nil {
 		if v != this.rows[0].MustGetFloat(field) {
-			this.t.Fatalf("field %s expect %f, got %f", field, v, this.rows[0].MustGetFloat(field))
+			this.Fatalf("field %s expect %f, got %f", field, v, this.rows[0].MustGetFloat(field))
 		}
 	} else {
-		this.t.Fatalf("unsupport type %#v", value)
+		this.Fatalf("unsupport type %#v", value)
 	}
 	return this
 }
